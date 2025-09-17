@@ -1,0 +1,3 @@
+Esta aplicación es una plataforma web privada para mejorar la comunicación entre instituciones educativas y padres de familia. Permite centralizar avisos, publicaciones por grupo y material multimedia en un solo lugar, accesible mediante login seguro.
+
+Su objetivo principal es ofrecer una comunicación organizada, segura y práctica, evitando la pérdida de información y protegiendo la privacidad de los estudiantes.
