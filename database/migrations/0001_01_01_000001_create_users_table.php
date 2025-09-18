@@ -17,6 +17,13 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            // Relación 1–N: cada usuario tiene UN rol
+            $table->foreignId('role_id')
+                  ->constrained('roles')
+                  ->cascadeOnUpdate()
+                  ->restrictOnDelete();
+            $table->string('avatar_path')->nullable();
+            $table->timestamp('avatar_updated_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
