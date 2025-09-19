@@ -18,5 +18,15 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        /*// 1) Fuerza JSON para la API o si el cliente lo pide
+        $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
+            return $request->is('api/*') || $request->expectsJson();
+        });*/
+
+        // 2) Respuesta 401 JSON cuando no está autenticado (Sanctum)
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return response()->json([
+                'message' => 'No autenticado. Por favor identifícate.',
+            ], 401);
+        });
     })->create();

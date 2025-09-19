@@ -25,3 +25,4 @@ Thumbs.db
 docker-compose.yml
 docker-entrypoint.sh
 Dockerfile
+docker
