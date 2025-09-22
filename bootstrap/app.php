@@ -15,7 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'permission'      => \App\Http\Middleware\Permission::class, //middleware de rol
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         /*// 1) Fuerza JSON para la API o si el cliente lo pide
