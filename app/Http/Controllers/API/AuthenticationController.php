@@ -78,15 +78,19 @@ class AuthenticationController extends Controller
 
             $user = Auth::user();
             $token = $user->createToken('authToken')->plainTextToken;
+            $role = Role::where('id', $user->role_id)->value('slug');
 
             return response()->json([
                 'response_code' => 200,
                 'status'        => 'success',
                 'message'       => 'Inicio de sesión exitoso',
-                'user_info'     => [
+                'user'     => [
                     'id'    => $user->id,
                     'name'  => $user->name,
                     'email' => $user->email,
+                    'role' => $role,
+                    'avatarPath' => $user->avatar_path,
+                    'createdAt' => $user->created_at
                 ],
                 'token'       => $token,
                 'token_type'  => 'Bearer',
