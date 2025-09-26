@@ -89,8 +89,8 @@ class AuthenticationController extends Controller
                     'name'  => $user->name,
                     'email' => $user->email,
                     'role' => $role,
-                    'avatarPath' => $user->avatar_path,
-                    'createdAt' => $user->created_at
+                    'avatar_path' => $user->avatar_path,
+                    'created_at' => $user->created_at
                 ],
                 'token'       => $token,
                 'token_type'  => 'Bearer',
