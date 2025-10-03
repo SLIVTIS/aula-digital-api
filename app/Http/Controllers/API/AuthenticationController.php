@@ -78,7 +78,7 @@ class AuthenticationController extends Controller
 
             $user = Auth::user();
             $token = $user->createToken('authToken')->plainTextToken;
-            $role = Role::where('id', $user->role_id)->value('slug');
+            $role = Role::select('id', 'slug', 'name')->find($user->role_id);
 
             return response()->json([
                 'response_code' => 200,
