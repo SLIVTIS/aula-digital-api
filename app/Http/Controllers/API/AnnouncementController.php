@@ -13,37 +13,61 @@ use Illuminate\Support\Facades\Log;
 class AnnouncementController extends Controller
 {
     public function index(Request $request)
-    {
-        try{
-            $q = Announcement::query()
-                ->with(['author:id,name', 'targets', 'reads'])
-                ->when($request->filled('visibility'), fn ($qq) =>
-                    $qq->where('visibility', $request->string('visibility'))
+{
+    try {
+        $q = Announcement::query()
+            ->with(['author:id,name', 'targets', 'reads'])
+            ->when($request->filled('visibility'), fn ($qq) =>
+                $qq->where('visibility', $request->string('visibility'))
+            )
+            ->when($request->filled('author_id'), fn ($qq) =>
+                $qq->where('author_user_id', $request->integer('author_id'))
+            )
+            ->when($request->filled('published'), fn ($qq) =>
+                $qq->when(
+                    $request->boolean('published'),
+                    fn ($qqq) => $qqq->whereNotNull('published_at'),
+                    fn ($qqq) => $qqq->whereNull('published_at')
                 )
-                ->when($request->filled('author_id'), fn ($qq) =>
-                    $qq->where('author_user_id', $request->integer('author_id'))
-                )
-                ->when($request->filled('published'), fn ($qq) =>
-                    $qq->when($request->boolean('published'), fn ($qqq) => $qqq->whereNotNull('published_at'),
-                        fn ($qqq) => $qqq->whereNull('published_at'))
-                );
+            );
 
-            if ($term = $request->string('q')->toString()) {
-                $q->whereFullText(['title','body_md'], $term);
-            }
+        // término de búsqueda (tu frontend ya manda ?q=...)
+        $term = trim((string) $request->query('q', ''));
 
-            return $q->orderByDesc('published_at')->orderByDesc('id')
-                     ->paginate($request->integer('per_page', 15));
-        } catch (\Exception $e) {
-            Log::error('Registration Error: ' . $e->getMessage());
+        if ($term !== '') {
+            // 1) Construye consulta boolean: +reunión* +otra*
+            $tokens = preg_split('/\s+/u', $term) ?: [];
+            $boolean = collect($tokens)
+                ->filter()
+                ->map(fn($w) => '+' . trim($w, "+-@><()~*\"'") . '*')
+                ->implode(' ');
 
-            return response()->json([
-                'response_code' => 500,
-                'status'        => 'error',
-                'message'       => 'Error interno del servidor: ' . $e->getMessage(),
-            ], 500);
+            // 2) Fallback LIKE (escapando % y _)
+            $like = '%' . str_replace(['%','_'], ['\%','\_'], $term) . '%';
+
+            $q->where(function ($sub) use ($boolean, $like) {
+                // FULLTEXT en modo booleano (evita la regla del 50%)
+                $sub->whereRaw("MATCH (title, body_md) AGAINST (? IN BOOLEAN MODE)", [$boolean])
+                    // Fallback por si algo falla o para colaciones particulares
+                    ->orWhere('title', 'like', $like)
+                    ->orWhere('body_md', 'like', $like);
+            });
         }
+
+        return $q->orderByDesc('published_at')
+                 ->orderByDesc('id')
+                 ->paginate($request->integer('per_page', 15))
+                 ->withQueryString();
+    } catch (\Exception $e) {
+        \Log::error('Announcements index error: ' . $e->getMessage());
+        return response()->json([
+            'response_code' => 500,
+            'status' => 'error',
+            'message' => 'Error interno del servidor: ' . $e->getMessage(),
+        ], 500);
     }
+}
+
 
     public function store(Request $request)
     {
