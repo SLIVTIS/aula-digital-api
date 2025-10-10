@@ -7,8 +7,11 @@ use Illuminate\Http\Request;
 
 use App\Models\Announcement;
 use App\Models\AnnouncementRead;
+use App\Models\AnnouncementTarget;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AnnouncementController extends Controller
 {
@@ -73,33 +76,97 @@ class AnnouncementController extends Controller
     {
         try{    
             $data = $request->validate([
-                'title'       => ['required','string','max:180'],
-                'body_md'     => ['required','string'],
-                'visibility'  => ['required', Rule::in(['all','groups','users'])],
-                'published_at'=> ['nullable','date'],
-                'is_archived' => ['boolean'],
+                'title'      => ['bail','required','string','max:180'],
+                'body_md'    => ['bail','required','string'],
+                'visibility' => ['bail','required', Rule::in(['all','groups','users'])],
+                'post'       => ['required','boolean'],
+
+                // Requerido solo si visibility es groups o users; debe ser arreglo con al menos 1
+                'targets'                       => ['required_if:visibility,groups,users','array','min:1'],
+
+                // Cada item debe indicar su tipo
+                'targets.*.target_type'         => ['bail','required', Rule::in(['group','user'])],
+
+                // Si target_type = group: group_id es requerido y permitido; si no, queda prohibido
+                'targets.*.group_id'            => [
+                    'required_if:targets.*.target_type,group',
+                    'prohibited_unless:targets.*.target_type,group',
+                    'integer',
+                    'exists:groups,id',
+                ],
+
+                // Si target_type = user: user_id es requerido y permitido; si no, queda prohibido
+                'targets.*.user_id'             => [
+                    'required_if:targets.*.target_type,user',
+                    'prohibited_unless:targets.*.target_type,user',
+                    'integer',
+                    'exists:users,id',
+                ],
             ]);
 
-            $data['author_user_id'] = auth()->id(); // o pásalo en el request si no hay auth
-            $ann = Announcement::create($data);
+             $data['author_user_id'] = auth()->id();
 
-            return response()->json($ann->load('author'), 201);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'response_code' => 422,
-                'status'        => 'error',
-                'message'       => 'La validación ha fallado',
-                'errors'        => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('Registration Error: ' . $e->getMessage());
+        $announcement = DB::transaction(function () use ($data) {
+            // 1) Crear el aviso (sin targets)
+            $payload = collect($data)->except('targets')->all();
+            /** @var Announcement $ann */
+            $ann = Announcement::create($payload);
 
-            return response()->json([
-                'response_code' => 500,
-                'status'        => 'error',
-                'message'       => 'Error interno del servidor: ' . $e->getMessage(),
-            ], 500);
-        }
+            // 2) Si aplica, crear los targets relacionados
+            if (in_array($data['visibility'], ['groups','users'], true) && !empty($data['targets'])) {
+                // opcional: eliminar duplicados (type+id)
+                $seen = [];
+                $rows = [];
+                foreach ($data['targets'] as $t) {
+                    $key = $t['target_type'] === 'group'
+                        ? 'group:'.$t['group_id']
+                        : 'user:'.$t['user_id'];
+
+                    if (isset($seen[$key])) continue;
+                    $seen[$key] = true;
+
+                    $rows[] = [
+                        'target_type'     => $t['target_type'],
+                        'group_id'        => $t['target_type'] === 'group' ? $t['group_id'] : null,
+                        'user_id'         => $t['target_type'] === 'user'  ? $t['user_id']  : null,
+                    ];
+                }
+
+                if ($rows) {
+                    // Usa la relación
+                    $ann->targets()->createMany($rows);
+                }
+            }
+
+            return $ann;
+        });
+
+        // Devuelve con relaciones útiles
+        return response()->json(
+            $announcement->load([
+                'author:id,name,email,avatar_path',
+                'targets.group:id,name,grade,section,code',
+                'targets.user:id,name,avatar_path',
+            ]),
+            201
+        );
+
+    } catch (ValidationException $e) {
+        return response()->json([
+            'response_code' => 422,
+            'status'        => 'error',
+            'message'       => 'La validación ha fallado',
+            'errors'        => $e->errors(),
+        ], 422);
+    } catch (\Exception $e) {
+        Log::error('Announcement store error: ' . $e->getMessage());
+
+        return response()->json([
+            'response_code' => 500,
+            'status'        => 'error',
+            'message'       => 'Error interno del servidor: ' . $e->getMessage(),
+        ], 500);
+    }
     }
 
 public function show(Announcement $announcement)
