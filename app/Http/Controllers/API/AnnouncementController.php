@@ -102,20 +102,102 @@ class AnnouncementController extends Controller
         }
     }
 
-    public function show(Announcement $announcement)
-    {
-        try{
-            return $announcement->load(['author','targets','reads']);
-        } catch (\Exception $e) {
-            Log::error('Registration Error: ' . $e->getMessage());
+public function show(Announcement $announcement)
+{
+    try {
+        // Cargamos el rol del autor para obtener el name
+        $announcement->load([
+            'author.role:id,name',
+            'targets.group:id,name,grade,section,code',
+            'targets.user:id,name,avatar_path',
+            'reads',
+        ]);
 
-            return response()->json([
-                'response_code' => 500,
-                'status'        => 'error',
-                'message'       => 'Error interno del servidor: ' . $e->getMessage(),
-            ], 500);
-        }
+        $author = $announcement->author
+            ? [
+                'id'          => $announcement->author->id,
+                'name'        => $announcement->author->name,
+                'email'       => $announcement->author->email,
+                'avatar_path' => $announcement->author->avatar_path,
+                'role'        => optional($announcement->author->role)->name,
+            ]
+            : null;
+
+                // Map de targets soportando group y user
+        $targets = $announcement->targets->map(function ($t) {
+            if ($t->target_type === 'group' && $t->group) {
+                return [
+                    'id'              => $t->id,
+                    'announcement_id' => $t->announcement_id,
+                    'target_type'     => 'group',
+                    'group' => [
+                        'id'      => $t->group->id,
+                        'name'    => $t->group->name,
+                        'grade'   => $t->group->grade,
+                        'section' => $t->group->section,
+                        'code'    => $t->group->code,
+                    ],
+                ];
+            }
+
+            if ($t->target_type === 'user' && $t->user) {
+                return [
+                    'id'              => $t->id,
+                    'announcement_id' => $t->announcement_id,
+                    'target_type'     => 'user',
+                    'user' => [
+                        'id'          => $t->user->id,
+                        'name'        => $t->user->name,
+                        'avatar_path' => $t->user->avatar_path,
+                    ],
+                ];
+            }
+
+            // Fallback: por si no hay relación cargada o target desconocido
+            return [
+                'id'              => $t->id,
+                'announcement_id' => $t->announcement_id,
+                'target_type'     => $t->target_type,
+                'group_id'        => $t->group_id,
+                'user_id'         => $t->user_id,
+            ];
+        })->values();
+
+        // Devolvemos un payload controlado
+        return response()->json([
+            'id'             => $announcement->id,
+            'title'          => $announcement->title,
+            'body_md'        => $announcement->body_md,
+            'author_user_id' => $announcement->author_user_id,
+            'visibility'     => $announcement->visibility,
+            'published_at'   => $announcement->published_at,
+            'is_archived'    => $announcement->is_archived,
+            'created_at'     => $announcement->created_at,
+            'updated_at'     => $announcement->updated_at,
+
+            'author'  => $author,
+
+            'targets'        => $targets,
+
+            'reads' => $announcement->reads->map(function ($r) {
+                return [
+                    'announcement_id' => $r->announcement_id,
+                    'user_id'         => $r->user_id,
+                    'read_at'         => $r->read_at,
+                ];
+            })->values(),
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Registration Error: ' . $e->getMessage());
+
+        return response()->json([
+            'response_code' => 500,
+            'status'        => 'error',
+            'message'       => 'Error interno del servidor: ' . $e->getMessage(),
+        ], 500);
     }
+}
 
     public function update(Request $request, Announcement $announcement)
     {
