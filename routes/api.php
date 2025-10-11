@@ -37,9 +37,12 @@ Route::group(['namespace' => 'App\Http\Controllers\API'], function () {
             */
             Route::get('announcements', [AnnouncementController::class, 'index']);
             Route::post('announcements', [AnnouncementController::class, 'store']);
-            Route::get('announcements/{announcement}', [AnnouncementController::class, 'show']);
-            Route::put('announcements/{announcement}', [AnnouncementController::class, 'update']);
-            Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy']);
+            Route::get('announcements/history', [AnnouncementController::class, 'history']);
+            
+            // Restringe el parámetro a números para evitar que "history" coincida
+            Route::get('announcements/{announcement}', [AnnouncementController::class, 'show'])->whereNumber('announcement');
+            Route::put('announcements/{announcement}', [AnnouncementController::class, 'update'])->whereNumber('announcement');
+            Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy'])->whereNumber('announcement');
 
             Route::post('announcements/{announcement}/publish', [AnnouncementController::class, 'publish']);
             Route::post('announcements/{announcement}/archive', [AnnouncementController::class, 'archive']);

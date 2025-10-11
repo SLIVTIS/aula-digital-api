@@ -376,4 +376,70 @@ public function show(Announcement $announcement)
             ], 500);
         }
     }
+
+    public function history(Request $request)
+{
+    // Historial DEL USUARIO AUTENTICADO (sin IDs en la ruta).
+    // El control de rol (admin/teacher) queda en el middleware.
+    try {
+        $authUser = $request->user();
+        if (!$authUser) {
+            abort(401, 'No autenticado');
+        }
+
+        $q = Announcement::query()
+            ->where('author_user_id', $authUser->id)
+            ->with([
+                'author:id,name,avatar_path',
+                'targets.group:id,name,grade,section,code',
+                'targets.user:id,name,avatar_path',
+                'reads',
+            ])
+            ->when($request->filled('visibility'), fn ($qq) =>
+                $qq->where('visibility', $request->string('visibility'))
+            )
+            ->when($request->filled('published'), fn ($qq) =>
+                $qq->when(
+                    $request->boolean('published'),
+                    fn ($qqq) => $qqq->whereNotNull('published_at'),
+                    fn ($qqq) => $qqq->whereNull('published_at')
+                )
+            )
+            ->when($request->filled('archived'), fn ($qq) =>
+                $qq->where('is_archived', $request->boolean('archived'))
+            );
+
+        // Búsqueda por término (?q=...)
+        $term = trim((string) $request->query('q', ''));
+        if ($term !== '') {
+            $tokens  = preg_split('/\s+/u', $term) ?: [];
+            $boolean = collect($tokens)
+                ->filter()
+                ->map(fn ($w) => '+' . trim($w, "+-@><()~*\"'") . '*')
+                ->implode(' ');
+
+            $like = '%' . str_replace(['%','_'], ['\%','\_'], $term) . '%';
+
+            $q->where(function ($sub) use ($boolean, $like) {
+                $sub->whereRaw("MATCH (title, body_md) AGAINST (? IN BOOLEAN MODE)", [$boolean])
+                    ->orWhere('title', 'like', $like)
+                    ->orWhere('body_md', 'like', $like);
+            });
+        }
+
+        return $q->orderByDesc('published_at')
+                 ->orderByDesc('id')
+                 ->paginate($request->integer('per_page', 15))
+                 ->withQueryString();
+    } catch (\Exception $e) {
+        \Log::error('Announcements history error: ' . $e->getMessage());
+        return response()->json([
+            'response_code' => 500,
+            'status'        => 'error',
+            'message'       => 'Error interno del servidor: ' . $e->getMessage(),
+        ], 500);
+    }
+}
+
+
 }
