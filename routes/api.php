@@ -10,6 +10,7 @@ use App\Http\Controllers\API\GroupStudentController;
 use App\Http\Controllers\API\TeacherGroupController;
 use App\Http\Controllers\API\AnnouncementController;
 use App\Http\Controllers\API\AnnouncementTargetController;
+use App\Http\Controllers\API\NotificationController;
 
 Route::get('/user', function (Request $request) {
     return "Hola esta es una prueba";
@@ -24,9 +25,28 @@ Route::group(['namespace' => 'App\Http\Controllers\API'], function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', 'AuthenticationController@logOut')->name('logout');
 
-        // Rutas CRUD generales (para autenticados), EXCLUYENDO las admin
+        // Rutas CRUD generales (para autenticados)
         Route::apiResource('users', UserController::class)
             ->except(['index', 'store', 'destroy']);
+
+        /*
+        ========== 
+         CRUD de Notificaciones
+        ==========
+        */
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::get('/notifications/badge', [NotificationController::class, 'badge']);
+        Route::get('/notifications/{notification}', [NotificationController::class, 'show']);
+
+        // Crear desde backend
+        Route::post('/notifications', [NotificationController::class, 'store']);
+
+        // Acciones de lectura
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+        // Eliminar
+        Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy']);
 
         // --- Teacher ---
         Route::middleware('permission:admin')->group(function () {
