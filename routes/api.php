@@ -11,6 +11,7 @@ use App\Http\Controllers\API\TeacherGroupController;
 use App\Http\Controllers\API\AnnouncementController;
 use App\Http\Controllers\API\AnnouncementTargetController;
 use App\Http\Controllers\API\NotificationController;
+use App\Http\Controllers\API\MediaItemController;
 
 Route::get('/user', function (Request $request) {
     return "Hola esta es una prueba";
@@ -47,6 +48,25 @@ Route::group(['namespace' => 'App\Http\Controllers\API'], function () {
 
         // Eliminar
         Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy']);
+
+        /*
+        ========== 
+         Multimedia
+        ==========
+        */
+        Route::get('/media', [MediaItemController::class, 'index']);
+        Route::post('/media', [MediaItemController::class, 'store']);
+        Route::get('/media/{media}', [MediaItemController::class, 'show']);
+        Route::match(['put','patch'], '/media/{media}', [MediaItemController::class, 'update']);
+        Route::delete('/media/{media}', [MediaItemController::class, 'destroy']);
+
+        //miniatura
+        // GET /api/media/{media}/thumbnail?size=sm|md|lg
+        Route::get('/media/{media}/thumbnail', [MediaItemController::class, 'thumbnail']);
+
+        // descarga segura
+        Route::get('/media/{media}/download', [MediaItemController::class, 'download']);
+
 
         // --- Teacher ---
         Route::middleware('permission:admin')->group(function () {
