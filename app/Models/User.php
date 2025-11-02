@@ -1,24 +1,17 @@
 <?php
-
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage; // <-- agrega
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'email',
@@ -27,21 +20,17 @@ class User extends Authenticatable
         'avatar_path'
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
+        // 'email',
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Para que el JSON incluya automáticamente el URL del avatar.
      */
+    protected $appends = ['avatar_url']; // <-- agrega
+
     protected function casts(): array
     {
         return [
@@ -50,19 +39,24 @@ class User extends Authenticatable
         ];
     }
 
-    // Relación: cada usuario pertenece a un rol
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
     }
 
-    // Helper
+    // Helper: URL público del avatar (o null si no hay)
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (!$this->avatar_path) return null;
+        // Ajusta el disco si usas otro distinto a 'public'
+        return Storage::disk('public')->url($this->avatar_path);
+    }
+
+    // Atajos de rol...
     public function isRole(string $slug): bool
     {
         return $this->role?->slug === $slug;
     }
-
-    // Atajos
     public function isAdmin(): bool   { return $this->isRole('admin'); }
     public function isTeacher(): bool { return $this->isRole('teacher'); }
     public function isParent(): bool  { return $this->isRole('parent'); }

@@ -12,6 +12,7 @@ use App\Http\Controllers\API\AnnouncementController;
 use App\Http\Controllers\API\AnnouncementTargetController;
 use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\API\MediaItemController;
+use App\Http\Controllers\API\ThreadController;
 
 Route::get('/user', function (Request $request) {
     return "Hola esta es una prueba";
@@ -48,6 +49,19 @@ Route::group(['namespace' => 'App\Http\Controllers\API'], function () {
 
         // Eliminar
         Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy']);
+
+        /*
+        ========== 
+         Mensajeria
+        ==========
+        */
+        Route::get('/threads', [ThreadController::class, 'index']);
+        Route::post('/threads', [ThreadController::class, 'store']);
+        Route::get('/threads/unread', [ThreadController::class, 'unreadSummary']);
+        Route::get('/threads/unread/count', [ThreadController::class, 'unreadCount']);
+        Route::get('/threads/{thread}', [ThreadController::class, 'show']);
+        Route::post('/threads/{thread}/messages', [ThreadController::class, 'storeMessage']);
+        Route::post('/threads/{thread}/read', [ThreadController::class, 'markRead']);
 
         /*
         ========== 
